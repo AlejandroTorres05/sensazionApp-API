@@ -6,6 +6,7 @@ import com.example.incidentreporter.exception.EntityNotFoundException;
 import com.example.incidentreporter.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +19,8 @@ import java.util.Optional;
 public class UserService {
 
     private final UserRepository userRepository;
+    // SOLUCIÓN: Inyección lazy para evitar dependencia circular
+    @Lazy
     private final FCMService fcmService;
 
     /**
@@ -68,17 +71,11 @@ public class UserService {
 
     /**
      * Actualiza el token FCM de un usuario
+     * VERSIÓN SIMPLIFICADA: Solo guarda el token, la validación se hace en el controlador
      */
     @Transactional
     public User updateFCMToken(String auth0Id, String fcmToken) {
-        // Validar el token FCM
-        boolean isValid = fcmService.validateFCMToken(fcmToken);
-        if (!isValid) {
-            log.warn("Invalid FCM token provided: {}", fcmToken);
-            return null;
-        }
-
-        // Buscar usuario por auth0Id o crear uno nuevo si no existe
+        // Buscar usuario por auth0Id
         User user = userRepository.findByAuth0Id(auth0Id)
                 .orElse(null);
 
@@ -87,7 +84,7 @@ public class UserService {
             return null;
         }
 
-        // Actualizar token
+        // Actualizar token (la validación la haremos en el controlador si es necesario)
         user.setFcmToken(fcmToken);
         return userRepository.save(user);
     }
@@ -122,6 +119,19 @@ public class UserService {
     @Transactional(readOnly = true)
     public Optional<User> findByFcmToken(String fcmToken) {
         return userRepository.findByFcmToken(fcmToken);
+    }
+
+    /**
+     * Valida un token FCM usando el servicio FCM
+     * Método público para uso externo cuando sea necesario
+     */
+    public boolean validateFCMToken(String fcmToken) {
+        try {
+            return fcmService.validateFCMToken(fcmToken);
+        } catch (Exception e) {
+            log.error("Error validating FCM token: {}", e.getMessage());
+            return false;
+        }
     }
 
     /**

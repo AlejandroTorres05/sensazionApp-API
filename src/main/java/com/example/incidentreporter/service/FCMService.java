@@ -1,24 +1,23 @@
 package com.example.incidentreporter.service;
 
 import com.example.incidentreporter.entity.Incident;
-import com.example.incidentreporter.entity.Notification;
 import com.example.incidentreporter.entity.User;
+import com.example.incidentreporter.repository.UserRepository;
 import com.google.firebase.messaging.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ExecutionException;
+import java.util.Optional;
 
 @Service
 @Slf4j
 @RequiredArgsConstructor
 public class FCMService {
 
-    private final UserService userService;
+    // SOLUCIÓN: Inyectar directamente el repository en lugar del service
+    private final UserRepository userRepository;
 
     /**
      * Envía una notificación FCM a un usuario específico
@@ -33,7 +32,7 @@ public class FCMService {
             Message message = Message.builder()
                     .setToken(fcmToken)
                     .setNotification(
-                            com.google.firebase.messaging.Notification.builder() // Nombre completo con paquete
+                            com.google.firebase.messaging.Notification.builder()
                                     .setTitle("⚠️ Incidente Detectado")
                                     .setBody(incident.getTitle() + " - " + (int) distance + "m de tu ubicación")
                                     .build()
@@ -111,12 +110,13 @@ public class FCMService {
      */
     public boolean validateFCMToken(String token) {
         try {
+            // Crear un mensaje de prueba con TTL de 0 para no enviarlo realmente
             Message message = Message.builder()
                     .setToken(token)
                     .setAndroidConfig(AndroidConfig.builder()
                             .setDirectBootOk(true)
                             .setPriority(AndroidConfig.Priority.HIGH)
-                            .setTtl(0)
+                            .setTtl(0) // TTL de 0 para no enviar realmente
                             .build())
                     .build();
 
@@ -125,26 +125,43 @@ public class FCMService {
         } catch (FirebaseMessagingException e) {
             if (e.getMessagingErrorCode() == MessagingErrorCode.INVALID_ARGUMENT ||
                     e.getMessagingErrorCode() == MessagingErrorCode.UNREGISTERED) {
+                log.warn("Invalid FCM token detected: {}", e.getMessage());
                 return false;
             }
-            // Para otros errores, consideramos que el token podría ser válido pero
-            // hay problemas de conexión
+            // Para otros errores, consideramos que el token podría ser válido
+            log.warn("FCM validation warning (token may still be valid): {}", e.getMessage());
             return true;
         }
     }
 
     /**
-     * Limpia tokens inválidos
+     * Limpia tokens inválidos - Método público para usar desde UserService
      */
     public void cleanupInvalidTokens() {
-        List<User> users = userService.findUsersWithFCMToken();
+        List<User> users = findUsersWithFCMToken();
         for (User user : users) {
             if (user.getFcmToken() != null && !validateFCMToken(user.getFcmToken())) {
                 log.info("Cleaning up invalid FCM token for user: {}", user.getEmail());
                 user.setFcmToken(null);
-                userService.saveUser(user);
+                userRepository.save(user);
             }
         }
+    }
+
+    /**
+     * Encuentra usuarios con token FCM válido
+     */
+    public List<User> findUsersWithFCMToken() {
+        return userRepository.findAll().stream()
+                .filter(user -> user.getFcmToken() != null && !user.getFcmToken().trim().isEmpty())
+                .toList();
+    }
+
+    /**
+     * Encuentra usuario por token FCM
+     */
+    public Optional<User> findByFcmToken(String fcmToken) {
+        return userRepository.findByFcmToken(fcmToken);
     }
 
     /**
@@ -158,9 +175,9 @@ public class FCMService {
                 if (ex.getMessagingErrorCode() == MessagingErrorCode.UNREGISTERED ||
                         ex.getMessagingErrorCode() == MessagingErrorCode.INVALID_ARGUMENT) {
                     String invalidToken = tokens.get(i);
-                    userService.findByFcmToken(invalidToken).ifPresent(user -> {
+                    findByFcmToken(invalidToken).ifPresent(user -> {
                         user.setFcmToken(null);
-                        userService.saveUser(user);
+                        userRepository.save(user);
                         log.info("Removed invalid FCM token for user: {}", user.getEmail());
                     });
                 }
