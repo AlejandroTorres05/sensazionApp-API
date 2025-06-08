@@ -23,8 +23,10 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/api/users/fcm-token").permitAll() // Permitir actualización de tokens FCM sin autenticación
+                        // Endpoints públicos (si los necesitas)
+                        .requestMatchers("/actuator/health").permitAll()
+                        .requestMatchers("/api/users/fcm-token").permitAll() // Si permites actualizar FCM sin auth
+                        // Todos los demás endpoints requieren autenticación Auth0
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)

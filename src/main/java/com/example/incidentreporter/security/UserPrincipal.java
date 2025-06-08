@@ -13,7 +13,14 @@ import java.util.Collections;
 @AllArgsConstructor
 public class UserPrincipal implements UserDetails {
 
-    private String username;
+    private String username; // Email o identificador del usuario
+    private String auth0UserId; // ID único de Auth0 (sub claim)
+
+    // Constructor para mantener compatibilidad
+    public UserPrincipal(String username) {
+        this.username = username;
+        this.auth0UserId = username;
+    }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
@@ -43,5 +50,12 @@ public class UserPrincipal implements UserDetails {
     @Override
     public boolean isEnabled() {
         return true;
+    }
+
+    /**
+     * Obtiene el ID único de Auth0
+     */
+    public String getAuth0UserId() {
+        return auth0UserId;
     }
 }

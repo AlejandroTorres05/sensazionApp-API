@@ -19,17 +19,24 @@ import java.io.IOException;
 @Slf4j
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-    private final JwtTokenProvider tokenProvider;
+    private final Auth0JwtTokenProvider auth0TokenProvider;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
-        String jwt = getJwtFromRequest(request);
+        try {
+            String jwt = getJwtFromRequest(request);
 
-        if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
-            Authentication authentication = tokenProvider.getAuthentication(jwt);
-            SecurityContextHolder.getContext().setAuthentication(authentication);
+            if (StringUtils.hasText(jwt) && auth0TokenProvider.validateToken(jwt)) {
+                Authentication authentication = auth0TokenProvider.getAuthentication(jwt);
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+                log.debug("Successfully authenticated user with Auth0 token");
+            }
+        } catch (Exception e) {
+            log.error("Could not set user authentication in security context", e);
+            // Limpiar el contexto de seguridad en caso de error
+            SecurityContextHolder.clearContext();
         }
 
         filterChain.doFilter(request, response);
@@ -41,5 +48,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return bearerToken.substring(7);
         }
         return null;
+    }
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
+        String path = request.getRequestURI();
+        // No filtrar endpoints públicos
+        return path.startsWith("/api/auth/") ||
+                path.equals("/api/users/fcm-token") ||
+                path.startsWith("/actuator/") ||
+                path.startsWith("/h2-console/");
     }
 }
