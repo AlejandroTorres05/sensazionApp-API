@@ -24,6 +24,7 @@ public class UserDTO {
     private int totalIncidentsReported;
     private int totalConfirmations;
     private double verificationScore;
+    private boolean profileCompleted;
     private LocalDateTime createdAt;
     private LocalDateTime lastActiveAt;
 }

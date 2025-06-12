@@ -1,10 +1,8 @@
 package com.example.incidentreporter.security;
 
 import com.auth0.jwt.JWT;
-import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.auth0.jwt.interfaces.DecodedJWT;
-import com.auth0.jwt.interfaces.JWTVerifier;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -40,34 +38,27 @@ public class Auth0JwtTokenProvider {
 
             // Verificar audience
             if (!jwt.getAudience().contains(auth0Audience)) {
-                log.error("Invalid audience in JWT token");
                 return false;
             }
 
             // Verificar issuer
             String expectedIssuer = "https://" + auth0Domain + "/";
             if (!expectedIssuer.equals(jwt.getIssuer())) {
-                log.error("Invalid issuer in JWT token");
                 return false;
             }
 
             // Verificar expiración
             if (jwt.getExpiresAt().before(new java.util.Date())) {
-                log.error("JWT token has expired");
                 return false;
             }
 
             // Para producción, aquí verificarías la firma con las claves públicas de Auth0
             // Por simplicidad en desarrollo, validamos solo la estructura y claims básicos
-
-            log.debug("JWT token validated successfully for user: {}", jwt.getSubject());
             return true;
 
         } catch (JWTVerificationException e) {
-            log.error("JWT token validation failed: {}", e.getMessage());
             return false;
         } catch (Exception e) {
-            log.error("Unexpected error during JWT validation: {}", e.getMessage());
             return false;
         }
     }
@@ -80,7 +71,6 @@ public class Auth0JwtTokenProvider {
             DecodedJWT jwt = JWT.decode(token);
             return jwt.getSubject();
         } catch (Exception e) {
-            log.error("Error extracting user ID from token: {}", e.getMessage());
             return null;
         }
     }
@@ -93,7 +83,6 @@ public class Auth0JwtTokenProvider {
             DecodedJWT jwt = JWT.decode(token);
             return jwt.getClaim("email").asString();
         } catch (Exception e) {
-            log.debug("Email not found in token or error extracting it: {}", e.getMessage());
             return null;
         }
     }
